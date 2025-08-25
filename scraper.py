@@ -55,13 +55,13 @@ def search_show(driver, show_name):
     wrap_shows_divs = driver.find_elements(By.CSS_SELECTOR, "div.wrap_shows")
     for div in wrap_shows_divs:
         try:
-            a_tag = div.find_element(By.CSS_SELECTOR, "a.btn_info")
-            href = a_tag.get_attribute("href")
-            if href:
-                show_links.append(href)
-                print(f"   ➡️ Found link: {href}")
+            a_tags = div.find_elements(By.CSS_SELECTOR, "a.btn_info")  # all links now
+            for a_tag in a_tags:
+                href = a_tag.get_attribute("href")
+                if href:
+                    show_links.append(href)
         except:
-            pass  # in case a div doesn't have a btn_info link
+            pass  # in case a div doesn't have btn_info links
 
     print(f"📄 Found {len(show_links)} show links")
     return show_links
@@ -93,6 +93,7 @@ def scrape_show_events(driver, show_url):
 
             # get event_id for pop-up
             event_id = row.find_element(By.CSS_SELECTOR, "a.load_event_iframe").get_attribute("data-event_id")
+            empty_seats = get_empty_seats(driver, event_id)
 
             events_data.append({
                 "title": title,
@@ -101,6 +102,7 @@ def scrape_show_events(driver, show_url):
                 "date": date,
                 "time": time_,
                 "event_id": event_id,
+                "empty_seats": empty_seats,
             })
 
         except Exception as e:
@@ -109,7 +111,22 @@ def scrape_show_events(driver, show_url):
 
     return events_data
 
-# Example: read all values
+def get_empty_seats(driver, event_id):
+    # Click the button to open the popup
+    btn = driver.find_element(By.CSS_SELECTOR, f"a.load_event_iframe[data-event_id='{event_id}']")
+    btn.click()
+    time.sleep(1)  # wait for popup to load
+
+    # Get the popup element
+    popup = driver.find_element(By.ID, f"pop_content_{event_id}")
+
+    # Count empty seats inside the popup
+    empty_seats = popup.find_elements(By.CSS_SELECTOR, "a.chair.empty[data-status='empty']")
+    empty_count = len(empty_seats)
+
+    return empty_count
+
+
 if __name__ == "__main__":
     from scraper import get_short_names, get_driver, search_show, scrape_show_events
 
@@ -118,7 +135,7 @@ if __name__ == "__main__":
 
     all_events = []
 
-    for name in short_names:  # remove the [:5] to process all
+    for name in short_names:  
         # 1️⃣ Search the show and get all links
         show_links = search_show(driver, name)
         print(f"Found {len(show_links)} links for '{name}'")
