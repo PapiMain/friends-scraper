@@ -118,6 +118,8 @@ def get_empty_seats(driver, event_id):
     btn = WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((By.CSS_SELECTOR, f"a.load_event_iframe[data-event_id='{event_id}']"))
     )
+    print(f"Found button for event {event_id}: displayed={btn.is_displayed()}, enabled={btn.is_enabled()}")
+
     driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
     
     # Click the button (use JS click to avoid interception issues)
@@ -127,17 +129,28 @@ def get_empty_seats(driver, event_id):
     popup = WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.ID, f"pop_content_{event_id}"))
     )
+    print(f"Popup found for event {event_id}: displayed={popup.is_displayed()}")
 
     # Wait for iframe inside popup
-    iframe = WebDriverWait(popup, 10).until(
-        EC.presence_of_element_located((By.TAG_NAME, "iframe"))
-    )
+    # iframe = WebDriverWait(popup, 10).until(
+    #     EC.presence_of_element_located((By.TAG_NAME, "iframe"))
+    # )
+
+    # Find all iframes inside popup
+    iframes = popup.find_elements(By.TAG_NAME, "iframe")
+    print(f"Number of iframes in popup {event_id}: {len(iframes)}")
+    for i, frame in enumerate(iframes):
+        print(f"iframe {i} id={frame.get_attribute('id')} src={frame.get_attribute('src')}")
 
     # Switch to iframe to access seats
-    driver.switch_to.frame(iframe)
+    driver.switch_to.frame(iframes[0])  # or find by ids
+    # OR more safely:
+    # driver.switch_to.frame(popup.find_element(By.ID, "smarticket"))
+
 
     # Count empty seats inside iframe
     empty_seats = driver.find_elements(By.CSS_SELECTOR, "a.chair.empty[data-status='empty']")
+    print(f"Empty seats found for event {event_id}: {len(empty_seats)}")
     empty_count = len(empty_seats)
     # Switch back to main content
     driver.switch_to.default_content()
@@ -159,7 +172,7 @@ if __name__ == "__main__":
         print(f"Found {len(show_links)} links for '{name}'")
 
         # 2️⃣ Go through each show link and scrape events
-        for link in show_links:
+        for link in show_links[:1]:  # limit to first link for testing
             events = scrape_show_events(driver, link)
             all_events.extend(events)
             print(f"Scraped {len(events)} events from {link}")
