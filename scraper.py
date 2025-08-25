@@ -40,15 +40,30 @@ def search_show(driver, show_name):
     driver.get("https://friends-hist.co.il/")
     time.sleep(2)  # wait for page to load
 
-    # Find the search input by class or name
+    # Find the search input
     search_box = driver.find_element(By.CSS_SELECTOR, "input.wcjapsSearchKeyword")
     
     search_box.clear()
     search_box.send_keys(show_name)
     search_box.send_keys(Keys.RETURN)  # press Enter
 
-    time.sleep(3)  # wait for results
+    time.sleep(3)  # wait for results to load
     print(f"🔎 Searched for: {show_name}")
+
+    # Get all show links in the results
+    show_links = []
+    wrap_shows_divs = driver.find_elements(By.CSS_SELECTOR, "div.wrap_shows")
+    for div in wrap_shows_divs:
+        try:
+            a_tag = div.find_element(By.CSS_SELECTOR, "a.btn_info")
+            href = a_tag.get_attribute("href")
+            if href:
+                show_links.append(href)
+        except:
+            pass  # in case a div doesn't have a btn_info link
+
+    print(f"📄 Found {len(show_links)} show links")
+    return show_links
 
 # Example: read all values
 if __name__ == "__main__":
