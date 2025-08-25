@@ -9,6 +9,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 import time
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 def get_short_names():
     service_account_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT"])
@@ -112,19 +114,21 @@ def scrape_show_events(driver, show_url):
     return events_data
 
 def get_empty_seats(driver, event_id):
-    # Click the button to open the popup
-    btn = driver.find_element(By.CSS_SELECTOR, f"a.load_event_iframe[data-event_id='{event_id}']")
+    # Wait until the button is clickable
+    btn = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.CSS_SELECTOR, f"a.load_event_iframe[data-event_id='{event_id}']"))
+    )
+    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
     btn.click()
-    time.sleep(1)  # wait for popup to load
 
-    # Get the popup element
-    popup = driver.find_element(By.ID, f"pop_content_{event_id}")
+    # Wait until popup content appears
+    popup = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.ID, f"pop_content_{event_id}"))
+    )
 
-    # Count empty seats inside the popup
+    # Count empty seats
     empty_seats = popup.find_elements(By.CSS_SELECTOR, "a.chair.empty[data-status='empty']")
-    empty_count = len(empty_seats)
-
-    return empty_count
+    return len(empty_seats)
 
 
 if __name__ == "__main__":
