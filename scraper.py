@@ -119,16 +119,30 @@ def get_empty_seats(driver, event_id):
         EC.element_to_be_clickable((By.CSS_SELECTOR, f"a.load_event_iframe[data-event_id='{event_id}']"))
     )
     driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
-    btn.click()
+    
+    # Click the button (use JS click to avoid interception issues)
+    driver.execute_script("arguments[0].click();", btn)
 
     # Wait until popup content appears
     popup = WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.ID, f"pop_content_{event_id}"))
     )
 
-    # Count empty seats
-    empty_seats = popup.find_elements(By.CSS_SELECTOR, "a.chair.empty[data-status='empty']")
-    return len(empty_seats)
+    # Wait for iframe inside popup
+    iframe = WebDriverWait(popup, 10).until(
+        EC.presence_of_element_located((By.TAG_NAME, "iframe"))
+    )
+
+    # Switch to iframe to access seats
+    driver.switch_to.frame(iframe)
+
+    # Count empty seats inside iframe
+    empty_seats = driver.find_elements(By.CSS_SELECTOR, "a.chair.empty[data-status='empty']")
+    empty_count = len(empty_seats)
+    # Switch back to main content
+    driver.switch_to.default_content()
+
+    return empty_count
 
 
 if __name__ == "__main__":
