@@ -136,7 +136,19 @@ def get_empty_seats(driver, event_id):
 
         # Switch to iframe
         driver.switch_to.frame(iframe)
+        
         try:
+            # If area selection table exists → click first "אנא בחר"
+            try:
+                area_button = WebDriverWait(driver, 3).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, "tr.area input.btn.btn-primary"))
+                )
+                print(f"Area selection detected for event {event_id}, clicking first button...")
+                driver.execute_script("arguments[0].click();", area_button)
+            except:
+                print(f"No area selection table for event {event_id}, continuing...")
+
+            # Now wait for seats to load
             WebDriverWait(driver, 5).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "a.chair.empty[data-status='empty']"))
             )
@@ -144,6 +156,7 @@ def get_empty_seats(driver, event_id):
             count = len(empty_seats)
             print(f"✅ Found {count} empty seats via popup iframe for event {event_id}")
             return count
+
         finally:
             driver.switch_to.default_content()
 
@@ -154,13 +167,24 @@ def get_empty_seats(driver, event_id):
     try:
         print(f"Trying direct iframe URL for event {event_id}")
         driver.get(iframe_src)  # reuse the iframe src we grabbed earlier
-        WebDriverWait(driver, 10).until(
+        try:
+            area_button = WebDriverWait(driver, 3).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "tr.area input.btn.btn-primary"))
+            )
+            print(f"Area selection detected for event {event_id}, clicking first button...")                
+            driver.execute_script("arguments[0].click();", area_button)
+        except:
+            print(f"No area selection table for event {event_id}, continuing...")
+
+        # Now wait for seats to load
+        WebDriverWait(driver, 5).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "a.chair.empty[data-status='empty']"))
         )
         empty_seats = driver.find_elements(By.CSS_SELECTOR, "a.chair.empty[data-status='empty']")
         count = len(empty_seats)
-        print(f"✅ Found {count} empty seats via direct iframe src for event {event_id}")
+        print(f"✅ Found {count} empty seats via popup iframe for event {event_id}")
         return count
+    
     except Exception as e:
         print(f"❌ Both popup and direct iframe methods failed for event {event_id}: {e}")
         return 0
