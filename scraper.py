@@ -131,19 +131,19 @@ def get_empty_seats(driver, event_id):
     )
     print(f"Popup found for event {event_id}: displayed={popup.is_displayed()}")
 
-    # Wait for iframe inside popup
-    # iframe = WebDriverWait(popup, 10).until(
-    #     EC.presence_of_element_located((By.TAG_NAME, "iframe"))
-    # )
+    # Wait until iframe loads inside popup
+    try:
+        iframe = WebDriverWait(popup, 10).until(
+            EC.presence_of_element_located((By.TAG_NAME, "iframe"))
+        )
+    except Exception:
+        print(f"❌ No iframe loaded for event {event_id}")
+        return 0
 
-    # Find all iframes inside popup
-    iframes = popup.find_elements(By.TAG_NAME, "iframe")
-    print(f"Number of iframes in popup {event_id}: {len(iframes)}")
-    for i, frame in enumerate(iframes):
-        print(f"iframe {i} id={frame.get_attribute('id')} src={frame.get_attribute('src')}")
+    print(f"iframe found: id={iframe.get_attribute('id')}, src={iframe.get_attribute('src')}")
 
     # Switch to iframe to access seats
-    driver.switch_to.frame(iframes[0])  # or find by ids
+    driver.switch_to.frame(iframe)  # or find by ids
     # OR more safely:
     # driver.switch_to.frame(popup.find_element(By.ID, "smarticket"))
 
