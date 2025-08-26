@@ -68,7 +68,6 @@ def search_show(driver, show_name):
     print(f"📄 Found {len(show_links)} show links")
     return show_links
 
-
 def scrape_show_events(driver, show_url):
     driver.get(show_url)
     time.sleep(2)  # let page load
@@ -114,62 +113,57 @@ def scrape_show_events(driver, show_url):
     return events_data
 
 def get_empty_seats(driver, event_id):
-    # Wait until the button is clickable
-    btn = WebDriverWait(driver, 10).until(
-        EC.element_to_be_clickable((By.CSS_SELECTOR, f"a.load_event_iframe[data-event_id='{event_id}']"))
-    )
-    print(f"Found button for event {event_id}: displayed={btn.is_displayed()}, enabled={btn.is_enabled()}")
-
-    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
-    
-    # Click the button (use JS click to avoid interception issues)
-    driver.execute_script("arguments[0].click();", btn)
-
-    # Wait until popup content appears
-    popup = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.ID, f"pop_content_{event_id}"))
-    )
-    print(f"Popup found for event {event_id}: displayed={popup.is_displayed()}")
-
-    # Wait until iframe loads inside popup
+    # 1. Try popup → iframe first
     try:
-        iframe = WebDriverWait(popup, 10).until(
+        btn = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, f"a.load_event_iframe[data-event_id='{event_id}']"))
+        )
+        print(f"Found button for event {event_id}")
+        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
+        driver.execute_script("arguments[0].click();", btn)
+
+        popup = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, f"pop_content_{event_id}"))
+        )
+        print(f"Popup found for event {event_id}")
+
+        # Wait for iframe
+        iframe = WebDriverWait(popup, 5).until(
             EC.presence_of_element_located((By.TAG_NAME, "iframe"))
         )
-    except Exception:
-        print(f"❌ No iframe loaded for event {event_id}")
-        return 0
+        iframe_src = iframe.get_attribute("src")
+        print(f"iframe detected for event {event_id}: {iframe_src}")
 
-    print(f"iframe found: id={iframe.get_attribute('id')}, src={iframe.get_attribute('src')}")
+        # Switch to iframe
+        driver.switch_to.frame(iframe)
+        try:
+            WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "a.chair.empty[data-status='empty']"))
+            )
+            empty_seats = driver.find_elements(By.CSS_SELECTOR, "a.chair.empty[data-status='empty']")
+            count = len(empty_seats)
+            print(f"✅ Found {count} empty seats via popup iframe for event {event_id}")
+            return count
+        finally:
+            driver.switch_to.default_content()
 
-    # Switch to iframe to access seats
-    driver.switch_to.frame(iframe)  # or find by ids
-    
-    # Debugging info
-    print(driver.execute_script("return window.location.href"))
-    print(driver.find_elements(By.TAG_NAME, "iframe"))  # should be 0, because you’re already inside one
+    except Exception as e:
+        print(f"⚠️ Popup iframe method failed for event {event_id}: {e}")
 
-    # Wait for seat map or fallback
+    # 2. Fallback → Direct iframe src navigation
     try:
-        seatmap = WebDriverWait(driver, 5).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "div.seatmap"))  # adjust if needed
+        print(f"Trying direct iframe URL for event {event_id}")
+        driver.get(iframe_src)  # reuse the iframe src we grabbed earlier
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "a.chair.empty[data-status='empty']"))
         )
-        print(f"✅ Seatmap container found for event {event_id}")
-    except:
-        print(f"⚠️ No seatmap container found for event {event_id}")
-
-    # Debug: print snippet of iframe HTML
-    iframe_html = driver.page_source[:1000]
-    print(f"--- Iframe HTML for event {event_id} ---\n{iframe_html}\n--- END ---")
-
-    # Count empty seats inside iframe
-    empty_seats = driver.find_elements(By.CSS_SELECTOR, "a.chair.empty[data-status='empty']")
-    print(f"Empty seats found for event {event_id}: {len(empty_seats)}")
-    empty_count = len(empty_seats)
-    # Switch back to main content
-    driver.switch_to.default_content()
-
-    return empty_count
+        empty_seats = driver.find_elements(By.CSS_SELECTOR, "a.chair.empty[data-status='empty']")
+        count = len(empty_seats)
+        print(f"✅ Found {count} empty seats via direct iframe src for event {event_id}")
+        return count
+    except Exception as e:
+        print(f"❌ Both popup and direct iframe methods failed for event {event_id}: {e}")
+        return 0
 
 
 if __name__ == "__main__":
