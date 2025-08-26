@@ -144,9 +144,23 @@ def get_empty_seats(driver, event_id):
 
     # Switch to iframe to access seats
     driver.switch_to.frame(iframe)  # or find by ids
-    # OR more safely:
-    # driver.switch_to.frame(popup.find_element(By.ID, "smarticket"))
+    
+    # Debugging info
+    print(driver.execute_script("return window.location.href"))
+    print(driver.find_elements(By.TAG_NAME, "iframe"))  # should be 0, because you’re already inside one
 
+    # Wait for seat map or fallback
+    try:
+        seatmap = WebDriverWait(driver, 5).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div.seatmap"))  # adjust if needed
+        )
+        print(f"✅ Seatmap container found for event {event_id}")
+    except:
+        print(f"⚠️ No seatmap container found for event {event_id}")
+
+    # Debug: print snippet of iframe HTML
+    iframe_html = driver.page_source[:1000]
+    print(f"--- Iframe HTML for event {event_id} ---\n{iframe_html}\n--- END ---")
 
     # Count empty seats inside iframe
     empty_seats = driver.find_elements(By.CSS_SELECTOR, "a.chair.empty[data-status='empty']")
