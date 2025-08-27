@@ -30,11 +30,26 @@ def get_short_names():
 
 def get_driver():
     chrome_options = Options()
-    chrome_options.add_argument("--headless")  # run without UI
+    
+    # ------------------------
+    # HEADLESS REMOVED for visual Chrome
+    # ------------------------
+    # chrome_options.add_argument("--headless")  
+
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--window-size=1920,1080")
+
+    # Use a realistic user-agent
+    chrome_options.add_argument(
+        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/139.0.0.0 Safari/537.36"
+    )
+
+    # Optional: prevent detection flags (may help some anti-bot scripts)
+    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
 
     driver = webdriver.Chrome(
         service=Service(ChromeDriverManager().install()),
@@ -44,13 +59,14 @@ def get_driver():
 
 def search_show(driver, show_name):
     driver.get("https://friends-hist.co.il/")
-    time.sleep(2)  # wait for page to load
+    time.sleep(3)  # wait for page to load
 
     # Find the search input
     search_box = driver.find_element(By.CSS_SELECTOR, "input.wcjapsSearchKeyword")
     
     search_box.clear()
     search_box.send_keys(show_name)
+    time.sleep(1)
     search_box.send_keys(Keys.RETURN)  # press Enter
 
     time.sleep(3)  # wait for results to load
@@ -132,6 +148,7 @@ def _click_first_area_if_present(driver):
         print(f"{len(areas)} area buttons detected inside iframe")
         if areas:
             driver.execute_script("arguments[0].scrollIntoView({block:'center'});", areas[0])
+            time.sleep(0.3)  # tiny pause before click
             driver.execute_script("arguments[0].click();", areas[0])
             print("✅ Clicked first area button")
             time.sleep(1.5)  # let seats render after area click
@@ -148,7 +165,10 @@ def _wait_for_any_seats(driver, timeout=20):
         chairs = d.find_elements(By.CSS_SELECTOR, "a.chair")
         containers = d.find_elements(By.CSS_SELECTOR, ".seatmap, #seatmap, [class*='seat-map'], [id*='seat-map']")
         print(f"🔹 Found {len(chairs)} chairs, {len(containers)} seatmap containers")
-        return bool(chairs or containers)
+        if chairs or containers:
+            return True
+        time.sleep(0.3)  # tiny wait before retry
+        return False
     WebDriverWait(driver, timeout).until(_seats_or_container)
 
 def _count_empty_seats(driver):
@@ -217,6 +237,7 @@ def get_empty_seats(driver, event_id):
         # Switch using the element we just chose (avoid frame_to_be_available_and_switch_to_it confusion)
         driver.switch_to.frame(iframe_el)
         _wait_dom_ready(driver, 10)
+        time.sleep(0.5)  # give JS a moment to finalize
         WebDriverWait(driver, 10).until(
         lambda d: bool(d.find_elements(By.CSS_SELECTOR, "table.areas, table.chair_map, a.chair"))
         )
@@ -256,7 +277,7 @@ def get_empty_seats(driver, event_id):
             print(f"Trying direct iframe URL for event {event_id}")
             driver.get(iframe_src)
             _wait_dom_ready(driver, 10)
-
+            time.sleep(0.5)  # give JS a moment to finalize
             _click_first_area_if_present(driver)
             _wait_for_any_seats(driver, timeout=20)
             count = _count_empty_seats(driver)
