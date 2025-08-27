@@ -130,10 +130,14 @@ def get_empty_seats(driver, event_id):
         print(f"Popup found for event {event_id}")
         print(f"Popup HTML snippet (first 500 chars):\n{popup.get_attribute('innerHTML')[:500]}")
 
-        iframe = WebDriverWait(popup, 5).until(
-            EC.presence_of_element_located((By.TAG_NAME, "iframe"))
+        # Wait for *any* iframe and switch to the last one
+        WebDriverWait(popup, 10).until(
+            EC.presence_of_all_elements_located((By.TAG_NAME, "iframe"))
         )
+        iframes = popup.find_elements(By.TAG_NAME, "iframe")
+        iframe = iframes[-1]
         iframe_src = iframe.get_attribute("src")
+
         print(f"iframe detected for event {event_id}: {iframe_src}")
         print(f"iframe element: id={iframe.get_attribute('id')}, src={iframe_src}")
         print(f"iframe HTML snippet (first 500 chars):\n{iframe.get_attribute('outerHTML')[:500]}")
@@ -144,7 +148,12 @@ def get_empty_seats(driver, event_id):
 
         # Click area selection if present
         try:
+            # Now wait for the area buttons explicitly
+            WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "tr.area input.btn.btn-primary"))
+            )
             areas = driver.find_elements(By.CSS_SELECTOR, "tr.area input.btn.btn-primary")
+
             print(f"{len(areas)} area buttons detected inside iframe")
 
             area_button = WebDriverWait(driver, 3).until(
@@ -177,6 +186,10 @@ def get_empty_seats(driver, event_id):
 
             # Click area selection if present
             try:
+                # Now wait for the area buttons explicitly
+                WebDriverWait(driver, 5).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "tr.area input.btn.btn-primary"))
+                )
                 areas = driver.find_elements(By.CSS_SELECTOR, "tr.area input.btn.btn-primary")
                 print(f"{len(areas)} area buttons detected inside iframe")
 
