@@ -183,7 +183,14 @@ def get_empty_seats(driver, event_id):
         iframes = popup.find_elements(By.CSS_SELECTOR, "iframe[src]")
         print(f"Found {len(iframes)} iframe(s) inside popup")
         candidates = [f for f in iframes if "/iframe/event/" in (f.get_attribute("src") or "")]
-        iframe_el = (candidates or iframes)[-1]  # prefer event iframe, else just last
+        # iframe_el = (candidates or iframes)[-1]  # prefer event iframe, else just last
+        iframe_el = WebDriverWait(popup, 10).until(
+        lambda el: next(
+        (f for f in el.find_elements(By.CSS_SELECTOR, "iframe[src*='/iframe/event/']")
+         if f.is_displayed()), 
+        None
+        )
+        )
 
         iframe_src = iframe_el.get_attribute("src")
         print(f"iframe detected for event {event_id}: {iframe_src}")
@@ -197,6 +204,9 @@ def get_empty_seats(driver, event_id):
         # Switch using the element we just chose (avoid frame_to_be_available_and_switch_to_it confusion)
         driver.switch_to.frame(iframe_el)
         _wait_dom_ready(driver, 10)
+        WebDriverWait(driver, 10).until(
+        lambda d: bool(d.find_elements(By.CSS_SELECTOR, "table.areas, table.chair_map, a.chair"))
+        )
         try:
             print("Inside iframe href:", driver.execute_script("return window.location.href"))
         except Exception:
