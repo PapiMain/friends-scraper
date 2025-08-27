@@ -120,6 +120,7 @@ def _wait_dom_ready(driver, timeout=10):
     WebDriverWait(driver, timeout).until(
         lambda d: d.execute_script("return document.readyState") in ("interactive", "complete")
     )
+    print("🟢 DOM ready state:", driver.execute_script("return document.readyState"))
 
 def _click_first_area_if_present(driver):
     try:
@@ -130,22 +131,24 @@ def _click_first_area_if_present(driver):
         areas = driver.find_elements(By.CSS_SELECTOR, "tr.area input.btn.btn-primary")
         print(f"{len(areas)} area buttons detected inside iframe")
         if areas:
+            driver.execute_script("arguments[0].scrollIntoView({block:'center'});", areas[0])
             driver.execute_script("arguments[0].click();", areas[0])
             print("✅ Clicked first area button")
             time.sleep(1.5)  # let seats render after area click
             return True
     except TimeoutException:
         print("No area selection table (or not visible yet), continuing...")
+    except Exception as e:
+        print(f"❌ Exception in _click_first_area_if_present: {e}")
     return False
 
 def _wait_for_any_seats(driver, timeout=20):
     # Some halls render seats differently; wait for any seat anchor or obvious seat containers
     def _seats_or_container(d):
-        if d.find_elements(By.CSS_SELECTOR, "a.chair"):
-            return True
-        if d.find_elements(By.CSS_SELECTOR, ".seatmap, #seatmap, [class*='seat-map'], [id*='seat-map']"):
-            return True
-        return False
+        chairs = d.find_elements(By.CSS_SELECTOR, "a.chair")
+        containers = d.find_elements(By.CSS_SELECTOR, ".seatmap, #seatmap, [class*='seat-map'], [id*='seat-map']")
+        print(f"🔹 Found {len(chairs)} chairs, {len(containers)} seatmap containers")
+        return bool(chairs or containers)
     WebDriverWait(driver, timeout).until(_seats_or_container)
 
 def _count_empty_seats(driver):
@@ -153,7 +156,17 @@ def _count_empty_seats(driver):
     empty = driver.find_elements(By.CSS_SELECTOR, "a.chair.empty[data-status='empty']")
     if not empty:
         empty = driver.find_elements(By.CSS_SELECTOR, "a.chair[data-status='empty'], a.chair.empty")
+    print(f"🔹 Counting empty seats: {len(empty)} found")
+    
+    # Optional: log first 5 empty seat labels
+    for e in empty[:5]:
+        try:
+            print("   -", e.get_attribute("aria-label"))
+        except Exception:
+            pass
     return len(empty)
+
+
 
 def get_empty_seats(driver, event_id):
     iframe_src = None  # keep for fallback
@@ -220,14 +233,16 @@ def get_empty_seats(driver, event_id):
         count = _count_empty_seats(driver)
         print(f"✅ Found {count} empty seats via popup iframe for event {event_id}")
         try:
-            print("Seatmap HTML snippet (first 500 chars):")
-            print(driver.page_source[:500])
+            print("Seatmap HTML snippet (first 1000 chars):")
+            print(driver.page_source[:1000])
         except Exception:
             pass
         return count
 
     except Exception as e:
         print(f"⚠️ Popup iframe method failed for event {event_id}: {e}")
+        driver.save_screenshot(f"screenshot_{event_id}.png")
+        print(f"Screenshot saved as screenshot_{event_id}.png")
     finally:
         # always reset context
         try:
@@ -247,14 +262,16 @@ def get_empty_seats(driver, event_id):
             count = _count_empty_seats(driver)
             print(f"✅ Found {count} empty seats via direct iframe src for event {event_id}")
             try:
-                print("Seatmap HTML snippet (first 500 chars):")
-                print(driver.page_source[:500])
+                print("Seatmap HTML snippet (first 1000 chars):")
+                print(driver.page_source[:1000])
             except Exception:
                 pass
             return count
 
         except Exception as e:
             print(f"❌ Both popup and direct iframe methods failed for event {event_id}: {e}")
+            driver.save_screenshot(f"screenshot_direct_{event_id}.png")
+            print(f"Screenshot saved as screenshot_direct_{event_id}.png")
 
     return 0
 
