@@ -20,9 +20,8 @@ def get_short_names():
     
 
     sheet = client.open("דאטה אפשיט אופיס").worksheet("הפקות")
-    data = sheet.get_all_records()
-
-    return [row["שם מקוצר"] for row in data if row["שם מקוצר"]]
+    short_names = sheet.col_values(2)  # for example, if "שם מקוצר" is column B
+    return [name for name in short_names if name and name != "שם מקוצר"]
 
 def get_driver():
     chrome_options = Options()
